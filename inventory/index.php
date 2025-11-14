@@ -1,174 +1,164 @@
-<?php include 'db.php'; ?>
+<?php
+include 'db.php';
+session_start();
+
+if (!isset($_SESSION['user'])) {
+    header("Location: login.php");
+    exit;
+}
+
+$sql = "SELECT * FROM products ORDER BY id DESC";
+$result = $conn->query($sql);
+?>
+
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <title>ระบบจัดการสินค้า</title>
-    <style>
-        /* Reset เบื้องต้น */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+<meta charset="UTF-8">
+<title>ระบบจัดการสินค้า</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    body {
+        font-family: 'Prompt', sans-serif;
+        background: #f4f7fc;
+        margin: 0;
+        padding: 0;
+    }
+    .container {
+        max-width: 95%;
+        width: 900px;
+        margin: 30px auto;
+        background: #fff;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    }
+    h2 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 20px;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    th, td {
+        border-bottom: 1px solid #ddd;
+        text-align: center;
+        padding: 10px;
+    }
+    th {
+        background: #4a90e2;
+        color: white;
+    }
+    tr:hover {
+        background: #f1f1f1;
+    }
+    a.btn, button.btn {
+        display: inline-block;
+        padding: 8px 14px;
+        border-radius: 6px;
+        text-decoration: none;
+        color: white;
+        font-size: 14px;
+    }
+    .btn-edit {
+        background: #3498db;
+    }
+    .btn-delete {
+        background: #e74c3c;
+    }
+    .btn-add {
+        display: block;
+        width: 100%;
+        margin-top: 20px;
+        background: #2ecc71;
+        text-align: center;
+        padding: 12px;
+        color: white;
+        border-radius: 8px;
+        font-size: 16px;
+        text-decoration: none;
+    }
+    img {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 8px;
+    }
 
-        /* หน้า body */
-        body {
-            background: linear-gradient(120deg, #f6d365, #fda085);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 30px;
+    /* Responsive */
+    @media (max-width: 600px) {
+        table, thead, tbody, th, td, tr {
+            display: block;
         }
-
-        /* หัวข้อ */
-        h2 {
-            margin-bottom: 20px;
-            color: #fff;
-            font-size: 2.2rem;
-            text-shadow: 1px 1px 4px rgba(0,0,0,0.3);
+        th { display: none; }
+        td {
+            text-align: right;
+            padding-left: 50%;
+            position: relative;
         }
-
-        /* ปุ่มทั่วไป */
-        .btn, .btn-danger {
-            text-decoration: none;
-            padding: 8px 18px;
-            border-radius: 8px;
-            margin: 5px;
-            display: inline-block;
+        td::before {
+            content: attr(data-label);
+            position: absolute;
+            left: 15px;
+            width: 45%;
             font-weight: bold;
-            transition: all 0.3s ease;
-            color: #fff;
-            cursor: pointer;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+            text-align: left;
         }
-
-        /* ปุ่มเพิ่ม/แก้ไข */
-        .btn {
-            background-color: #4CAF50;
-        }
-
-        .btn:hover {
-            background-color: #45a049;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        }
-
-        /* ปุ่มลบ */
-        .btn-danger {
-            background-color: #f44336;
-        }
-
-        .btn-danger:hover {
-            background-color: #da190b;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        }
-
-        /* ตารางสินค้า */
-        table {
-            width: 95%;
-            max-width: 1200px;
-            border-collapse: collapse;
-            background-color: rgba(255,255,255,0.95);
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.25);
-            margin-top: 20px;
-        }
-
-        /* หัวตาราง */
-        table th {
-            background-color: #ff7e5f;
-            color: #fff;
-            font-weight: bold;
-            padding: 14px 10px;
-            text-align: center;
-        }
-
-        /* แถวข้อมูล */
-        table td {
-            padding: 12px 10px;
-            text-align: center;
-            border-bottom: 1px solid #eee;
-        }
-
-        /* สลับสีแถว */
-        table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-
-        /* รูปสินค้า */
-        table img {
-            border-radius: 8px;
-            transition: transform 0.3s;
-        }
-
-        table img:hover {
-            transform: scale(1.1);
-        }
-
-        /* Responsive สำหรับมือถือ */
-        @media (max-width: 768px) {
-            table, thead, tbody, th, td, tr {
-                display: block;
-            }
-            table tr {
-                margin-bottom: 15px;
-            }
-            table td {
-                text-align: right;
-                padding-left: 50%;
-                position: relative;
-            }
-            table td::before {
-                content: attr(data-label);
-                position: absolute;
-                left: 15px;
-                width: calc(50% - 30px);
-                font-weight: bold;
-                text-align: left;
-            }
-            table th {
-                display: none;
-            }
-        }
-    </style>
+    }
+</style>
 </head>
 <body>
+    
+<div class="container">
     <h2>📦 ระบบจัดการสินค้า</h2>
-    <a href="add.php" class="btn">➕ เพิ่มสินค้า</a>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+  <h2></h2>
+  <div>
+<a href="add.php" class="btn btn-success" style="color: black;">➕ เพิ่มสินค้าใหม่</a>
+<a href="dashboard.php" class="btn btn-primary" style="color: black;">📊 ดูรายงานสต็อก</a>
+
+  </div>
+</div>
+
     <table>
-        <tr>
-            <th>ID</th>
-            <th>รหัสสินค้า</th>
-            <th>ชื่อสินค้า</th>
-            <th>จำนวน</th>
-            <th>รูปสินค้า</th>
-            <th>การจัดการ</th>
-        </tr>
-        <?php
-        $result = $conn->query("SELECT * FROM products ORDER BY id DESC");
-        if($result && $result->num_rows > 0){
-            while ($row = $result->fetch_assoc()) {
-                echo "<tr>
-                    <td data-label='ID'>{$row['id']}</td>
-                    <td data-label='รหัสสินค้า'>{$row['product_code']}</td>
-                    <td data-label='ชื่อสินค้า'>{$row['name']}</td>
-                    <td data-label='จำนวน'>{$row['quantity']}</td>
-                    <td data-label='รูปสินค้า'><img src='{$row['image']}' width='80'></td>
-                    <td data-label='การจัดการ'>
-                        <a href='edit.php?id={$row['id']}' class='btn'>✏️ แก้ไข</a>
-                        <a href='delete.php?id={$row['id']}' class='btn-danger' onclick='return confirm(\"ยืนยันการลบ?\")'>🗑️ ลบ</a>
-                    </td>
-                </tr>";
-            }
-        } else {
-            echo "<tr><td colspan='6' style='text-align:center; padding:20px;'>ไม่มีสินค้าในระบบ</td></tr>";
-        }
-        ?>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>รหัสสินค้า</th>
+                <th>ชื่อสินค้า</th>
+                <th>จำนวน</th>
+                <th>ภาพ</th>
+                <th>วันที่เพิ่ม</th>
+                <th>จัดการ</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php while($row = $result->fetch_assoc()): ?>
+            <tr>
+                <td data-label="ID"><?= $row['id']; ?></td>
+                <td data-label="รหัสสินค้า"><?= htmlspecialchars($row['product_code']); ?></td>
+                <td data-label="ชื่อสินค้า"><?= htmlspecialchars($row['name']); ?></td>
+                <td data-label="จำนวน"><?= $row['quantity']; ?></td>
+                <td data-label="ภาพ">
+                    <?php if ($row['image']): ?>
+                        <img src="<?= htmlspecialchars($row['image']); ?>" alt="สินค้า">
+                    <?php else: ?>
+                        ไม่มีรูป
+                    <?php endif; ?>
+                </td>
+                <td data-label="วันที่"><?= $row['created_at']; ?></td>
+                <td data-label="จัดการ">
+                    <a href="edit.php?id=<?= $row['id']; ?>" class="btn btn-edit">แก้ไข</a>
+                    <a href="delete.php?id=<?= $row['id']; ?>" class="btn btn-delete" onclick="return confirm('ต้องการลบสินค้านี้หรือไม่?')">ลบ</a>
+                </td>
+            </tr>
+        <?php endwhile; ?>
+        </tbody>
     </table>
+
+    <a href="add.php" class="btn-add">➕ เพิ่มสินค้าใหม่</a>
+</div>
 </body>
 </html>
