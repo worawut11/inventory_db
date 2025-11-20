@@ -2,13 +2,47 @@
 include 'db.php';
 session_start();
 
+// ถ้าไม่ได้ล็อกอิน → กลับไปหน้า login
 if (!isset($_SESSION['user'])) {
     header("Location: login.php");
     exit;
 }
 
-$sql = "SELECT * FROM products ORDER BY id DESC";
+// id ผู้ใช้ที่ล็อกอินปัจจุบัน
+$user_id = (int)$_SESSION['user'];
+
+// ======================
+// ดึงข้อมูลผู้ใช้
+// ======================
+$userSql   = "SELECT * FROM users WHERE id = $user_id LIMIT 1";
+$userQuery = $conn->query($userSql);
+
+if (!$userQuery) {
+    die("SQL Error (users): " . $conn->error);
+}
+
+$user = $userQuery->fetch_assoc();
+
+// กันกรณีหา user ไม่เจอ
+if (!$user) {
+    // ถ้าไม่พบ user ให้บังคับออกจากระบบ
+    session_destroy();
+    header("Location: login.php");
+    exit;
+}
+
+// รูปผู้ใช้ ถ้าไม่มีใช้ default.png
+$user_photo = (!empty($user['photo'])) ? $user['photo'] : 'default.png';
+
+// ======================
+// ดึงข้อมูลสินค้า
+// ======================
+$sql    = "SELECT * FROM products ORDER BY id DESC";
 $result = $conn->query($sql);
+
+if (!$result) {
+    die("SQL Error (products): " . $conn->error);
+}
 ?>
 
 <!DOCTYPE html>
@@ -38,6 +72,49 @@ $result = $conn->query($sql);
         color: #333;
         margin-bottom: 20px;
     }
+
+    /* กล่องโปรไฟล์ผู้ใช้ */
+    .user-box {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #eef2ff;
+        padding: 12px 16px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+    .user-info-wrap {
+        display: flex;
+        align-items: center;
+    }
+    .user-box img {
+        width: 55px;
+        height: 55px;
+        border-radius: 50%;
+        margin-right: 12px;
+        object-fit: cover;
+        border: 2px solid #555;
+    }
+    .user-info .name {
+        font-size: 16px;
+        font-weight: 600;
+        color: #111;
+    }
+    .user-info .small {
+        font-size: 13px;
+        color: #555;
+    }
+    .btn-logout {
+        padding: 8px 14px;
+        border-radius: 6px;
+        background: #ff6666;
+        color: #fff;
+        border: none;
+        text-decoration: none;
+        font-size: 14px;
+    }
+
     table {
         width: 100%;
         border-collapse: collapse;
@@ -62,12 +139,8 @@ $result = $conn->query($sql);
         color: white;
         font-size: 14px;
     }
-    .btn-edit {
-        background: #3498db;
-    }
-    .btn-delete {
-        background: #e74c3c;
-    }
+    .btn-edit { background: #3498db; }
+    .btn-delete { background: #e74c3c; }
     .btn-add {
         display: block;
         width: 100%;
@@ -80,7 +153,7 @@ $result = $conn->query($sql);
         font-size: 16px;
         text-decoration: none;
     }
-    img {
+    img.product-img {
         width: 60px;
         height: 60px;
         object-fit: cover;
@@ -106,6 +179,11 @@ $result = $conn->query($sql);
             font-weight: bold;
             text-align: left;
         }
+        .user-box {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
     }
 </style>
 </head>
@@ -113,14 +191,30 @@ $result = $conn->query($sql);
     
 <div class="container">
     <h2>📦 ระบบจัดการสินค้า</h2>
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-  <h2></h2>
-  <div>
-<a href="add.php" class="btn btn-success" style="color: black;">➕ เพิ่มสินค้าใหม่</a>
-<a href="dashboard.php" class="btn btn-primary" style="color: black;">📊 ดูรายงานสต็อก</a>
 
-  </div>
-</div>
+    <!-- กล่องแสดงข้อมูลผู้ใช้ที่ล็อกอิน -->
+    <div class="user-box">
+        <div class="user-info-wrap">
+            <img src="<?= htmlspecialchars($user_photo); ?>" alt="User Photo">
+            <div class="user-info">
+                <div class="name"><?= htmlspecialchars($user['username']); ?></div>
+                <div class="small">
+                    ID ผู้ใช้งาน : <?= $user['id']; ?> 
+                    | สิทธิ์ : <?= htmlspecialchars($user['role']); ?>
+                </div>
+            </div>
+        </div>
+        <a href="logout.php" class="btn-logout">ออกจากระบบ</a>
+    </div>
+
+    <!-- ปุ่มเพิ่มสินค้า + Dashboard -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div></div>
+        <div>
+            <a href="add.php" class="btn" style="background:#aee8ff; color:black;">➕ เพิ่มสินค้าใหม่</a>
+            <a href="dashboard.php" class="btn" style="background:#ffe4a8; color:black;">📊 ดูรายงานสต็อก</a>
+        </div>
+    </div>
 
     <table>
         <thead>
@@ -142,8 +236,8 @@ $result = $conn->query($sql);
                 <td data-label="ชื่อสินค้า"><?= htmlspecialchars($row['name']); ?></td>
                 <td data-label="จำนวน"><?= $row['quantity']; ?></td>
                 <td data-label="ภาพ">
-                    <?php if ($row['image']): ?>
-                        <img src="<?= htmlspecialchars($row['image']); ?>" alt="สินค้า">
+                    <?php if (!empty($row['image'])): ?>
+                        <img src="<?= htmlspecialchars($row['image']); ?>" alt="สินค้า" class="product-img">
                     <?php else: ?>
                         ไม่มีรูป
                     <?php endif; ?>
