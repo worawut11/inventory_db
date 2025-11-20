@@ -1,146 +1,123 @@
-<?php include 'db.php'; ?>
+<?php
+include 'db.php';
+session_start();
+
+// ถ้ายังไม่ได้ล็อกอิน → กลับหน้า login
+if (!isset($_SESSION['user'])) {
+    header("Location: login.php");
+    exit;
+}
+
+if (isset($_POST['add'])) {
+    $product_code = $_POST['product_code'];
+    $name = $_POST['name'];
+    $quantity = $_POST['quantity'];
+    $image = $_POST['image'];
+
+    $sql = "INSERT INTO products (product_code, name, quantity, image)
+            VALUES ('$product_code', '$name', '$quantity', '$image')";
+    
+    if ($conn->query($sql)) {
+        header("Location: index.php");
+        exit;
+    } else {
+        $error = "❌ เกิดข้อผิดพลาดในการเพิ่มสินค้า";
+    }
+}
+?>
+
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <title>เพิ่มสินค้า</title>
-    <link rel="stylesheet" href="style.css">
-    <style>
-        /* ตั้งค่าพื้นฐานให้หน้า */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-
-        /* กล่องฟอร์ม */
-        .form-container {
-            background: #fff;
-            padding: 30px 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
-        }
-
-        h2 {
-            margin-bottom: 25px;
-            color: #333;
-        }
-
-        label {
-            display: block;
-            margin: 12px 0 5px;
-            font-weight: 600;
-            text-align: left;
-        }
-
-        input[type="text"],
-        input[type="number"],
-        input[type="file"] {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            outline: none;
-            transition: 0.3s;
-        }
-
-        input[type="text"]:focus,
-        input[type="number"]:focus,
-        input[type="file"]:focus {
-            border-color: #007bff;
-        }
-
-        button {
-            margin-top: 20px;
-            padding: 10px 18px;
-            border: none;
-            background: #007bff;
-            color: #fff;
-            font-size: 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-
-        button:hover {
-            background: #0056b3;
-        }
-
-        .btn {
-            display: inline-block;
-            margin-top: 15px;
-            text-decoration: none;
-            padding: 8px 15px;
-            background: #6c757d;
-            color: #fff;
-            border-radius: 8px;
-            transition: 0.3s;
-        }
-
-        .btn:hover {
-            background: #5a6268;
-        }
-
-        .success {
-            margin-top: 15px;
-            color: #28a745;
-        }
-
-        .error {
-            margin-top: 15px;
-            color: #dc3545;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>เพิ่มสินค้าใหม่</title>
+<style>
+    body {
+        font-family: 'Prompt', sans-serif;
+        background: #f2f6fc;
+        margin: 0;
+        padding: 0;
+    }
+    .container {
+        max-width: 500px;
+        margin: 50px auto;
+        background: #fff;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    h2 {
+        text-align: center;
+        color: #333;
+    }
+    label {
+        font-weight: bold;
+        margin-top: 15px;
+        display: block;
+    }
+    input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        margin-top: 5px;
+    }
+    button {
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 12px;
+        border-radius: 8px;
+        width: 100%;
+        margin-top: 20px;
+        cursor: pointer;
+        font-size: 16px;
+    }
+    button:hover {
+        background: #218838;
+    }
+    a {
+        display: block;
+        text-align: center;
+        margin-top: 15px;
+        text-decoration: none;
+        color: #333;
+    }
+    a:hover {
+        color: #007bff;
+    }
+    .error {
+        color: red;
+        text-align: center;
+    }
+</style>
 </head>
 <body>
-    <div class="form-container">
-        <h2>➕ เพิ่มสินค้าใหม่</h2>
-        <form action="" method="POST" enctype="multipart/form-data">
-            <label>รหัสสินค้า</label>
-            <input type="text" name="product_code" required>
+<div class="container">
+    <h2>➕ เพิ่มสินค้าใหม่</h2>
 
-            <label>ชื่อสินค้า</label>
-            <input type="text" name="name" required>
+    <?php if (isset($error)): ?>
+        <p class="error"><?= $error; ?></p>
+    <?php endif; ?>
 
-            <label>จำนวน</label>
-            <input type="number" name="quantity" required>
+    <form method="post">
+        <label>รหัสสินค้า</label>
+        <input type="text" name="product_code" placeholder="เช่น P001" required>
 
-            <label>อัปโหลดรูป</label>
-            <input type="file" name="image">
+        <label>ชื่อสินค้า</label>
+        <input type="text" name="name" placeholder="ชื่อสินค้า..." required>
 
-            <button type="submit" name="submit">บันทึก</button>
-        </form>
+        <label>จำนวน</label>
+        <input type="number" name="quantity" placeholder="จำนวน..." required>
 
-        <?php
-        if (isset($_POST['submit'])) {
-            $code = $_POST['product_code'];
-            $name = $_POST['name'];
-            $qty  = $_POST['quantity'];
+        <label>ลิงก์รูปภาพ (URL)</label>
+        <input type="text" name="image" placeholder="https://example.com/image.jpg">
 
-            $img = "";
-            if ($_FILES['image']['name'] != "") {
-                $target_dir = "uploads/";
-                if (!is_dir($target_dir)) mkdir($target_dir);
-                $img = $target_dir . time() . "_" . basename($_FILES["image"]["name"]);
-                move_uploaded_file($_FILES["image"]["tmp_name"], $img);
-            }
+        <button type="submit" name="add">💾 บันทึกสินค้า</button>
+    </form>
 
-            $sql = "INSERT INTO products (product_code, name, quantity, image) VALUES ('$code','$name','$qty','$img')";
-            if ($conn->query($sql)) {
-                echo "<p class='success'>✅ เพิ่มสินค้าสำเร็จ</p>";
-            } else {
-                echo "<p class='error'>❌ เกิดข้อผิดพลาด</p>";
-            }
-        }
-        ?>
-        <a href="index.php" class="btn">⬅️ กลับหน้าแรก</a>
-    </div>
+    <a href="index.php">⬅ กลับหน้าหลัก</a>
+</div>
 </body>
 </html>
