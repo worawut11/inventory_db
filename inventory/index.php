@@ -21,7 +21,7 @@ if (!$userQuery || $userQuery->num_rows == 0) {
     exit;
 }
 
-$user = $userQuery->fetch_assoc(); // fetch_assoc() ครั้งเดียว
+$user = $userQuery->fetch_assoc();
 $user_photo = (!empty($user['photo'])) ? $user['photo'] : 'default.png';
 $user_role  = (!empty($user['role'])) ? $user['role'] : '-';
 
@@ -310,6 +310,19 @@ img.product-img {
         </thead>
         <tbody>
         <?php while($row = $result->fetch_assoc()): ?>
+            <?php
+                $img = $row['image'];
+
+                // ถ้าเป็นลิงก์เต็ม (เริ่มด้วย http/https) → ใช้ตามนั้น
+                if (!empty($img) && preg_match('/^https?:\/\//', $img)) {
+                    $src = $img;
+                } else if (!empty($img)) {
+                    // ถ้าเป็นแค่ชื่อไฟล์ → ต่อกับโฟลเดอร์ uploads
+                    $src = 'uploads/' . $img;
+                } else {
+                    $src = '';
+                }
+            ?>
             <tr>
                 <td data-label="ID"><?= $row['id']; ?></td>
                 <td data-label="รหัสสินค้า"><?= htmlspecialchars($row['product_code']); ?></td>
@@ -317,8 +330,8 @@ img.product-img {
                 <td data-label="จำนวน"><?= $row['quantity']; ?></td>
                 <td data-label="min_stock"><?= $row['min_stock']; ?></td>
                 <td data-label="ภาพ">
-                    <?php if (!empty($row['image'])): ?>
-                        <img src="<?= htmlspecialchars($row['image']); ?>" alt="สินค้า" class="product-img">
+                    <?php if (!empty($src)): ?>
+                        <img src="<?= htmlspecialchars($src); ?>" alt="สินค้า" class="product-img">
                     <?php else: ?>
                         ไม่มีรูป
                     <?php endif; ?>

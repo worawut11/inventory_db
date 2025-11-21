@@ -113,20 +113,39 @@ if (isset($_POST['update'])) {
     <?php endif; ?>
 
     <form method="post">
-        <label>รหัสสินค้า</label>
-        <input type="text" name="product_code" value="<?= htmlspecialchars($product['product_code']); ?>" required>
+    <label>รหัสสินค้า</label>
+    <input type="text" name="product_code" 
+           value="<?= htmlspecialchars($product['product_code']); ?>" required>
 
-        <label>ชื่อสินค้า</label>
-        <input type="text" name="name" value="<?= htmlspecialchars($product['name']); ?>" required>
+    <label>ชื่อสินค้า</label>
+    <input type="text" name="name" 
+           value="<?= htmlspecialchars($product['name']); ?>" required>
 
-        <label>จำนวน</label>
-        <input type="number" name="quantity" value="<?= htmlspecialchars($product['quantity']); ?>" required>
+    <label>จำนวน</label>
+    <input type="number" name="quantity" 
+           value="<?= htmlspecialchars($product['quantity']); ?>" required>
 
-        <label>ลิงก์รูปภาพ</label>
-        <input type="text" name="image" value="<?= htmlspecialchars($product['image']); ?>">
+<label>ลิงก์รูปภาพ</label>
 
-        <button type="submit" name="update">💾 บันทึกการแก้ไข</button>
-    </form>
+<?php if (!empty($product['image'])): ?>
+    <!-- แสดงรูปตัวอย่าง -->
+    <div style="margin:10px 0; text-align:center;">
+        <img src="<?= htmlspecialchars($product['image']); ?>" 
+             alt="รูปสินค้า" 
+             style="max-width:150px; max-height:150px; border-radius:8px; border:1px solid #ccc;">
+        <br>
+        <a href="<?= htmlspecialchars($product['image']); ?>" 
+           target="_blank" 
+           style="display:inline-block; margin-top:5px; font-size:13px;">
+            🔍 เปิดดูรูปเต็ม
+        </a>
+    </div>
+<?php endif; ?>
+<label>อัปโหลดรูปภาพสินค้า</label>
+<input type="file" name="image" accept="image/*">
+
+<button type="submit" name="update">💾 บันทึกการแก้ไข</button>
+</form>
 
     <a href="index.php">⬅ กลับหน้าหลัก</a>
 </div>

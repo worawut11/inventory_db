@@ -10,18 +10,53 @@ if (!isset($_SESSION['user'])) {
 
 if (isset($_POST['add'])) {
     $product_code = $_POST['product_code'];
-    $name = $_POST['name'];
-    $quantity = $_POST['quantity'];
-    $image = $_POST['image'];
+    $name         = $_POST['name'];
+    $quantity     = $_POST['quantity'];
 
-    $sql = "INSERT INTO products (product_code, name, quantity, image)
-            VALUES ('$product_code', '$name', '$quantity', '$image')";
-    
-    if ($conn->query($sql)) {
-        header("Location: index.php");
-        exit;
-    } else {
-        $error = "❌ เกิดข้อผิดพลาดในการเพิ่มสินค้า";
+    // เตรียมตัวแปรเก็บชื่อไฟล์ภาพ (ที่จะบันทึกลงฐานข้อมูล)
+    $image_name = null;
+
+    // ถ้ามีการอัปโหลดไฟล์รูปมา
+    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+
+        // โฟลเดอร์สำหรับเก็บรูป (สร้างโฟลเดอร์นี้ไว้ในโปรเจกต์ก่อน เช่น htdocs/inventory/uploads)
+        $upload_dir = 'uploads/';
+
+        // ดึงข้อมูลไฟล์
+        $tmp_name   = $_FILES['image']['tmp_name'];
+        $original   = basename($_FILES['image']['name']);
+
+        // ต่อเวลา (นาที+วินาที) กันชื่อซ้ำก็ได้
+        $ext        = pathinfo($original, PATHINFO_EXTENSION);
+        $safe_name  = pathinfo($original, PATHINFO_FILENAME);
+        $safe_name  = preg_replace('/[^A-Za-z0-9_-]/', '_', $safe_name); // เคลียร์ตัวอักษรแปลก ๆ
+        $image_name = $safe_name . '_' . time() . '.' . $ext;
+
+        $target_path = $upload_dir . $image_name;
+
+        // สร้างโฟลเดอร์ถ้ายังไม่มี
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0777, true);
+        }
+
+        // ย้ายไฟล์จาก temp ไปยังโฟลเดอร์จริง
+        if (!move_uploaded_file($tmp_name, $target_path)) {
+            $error = "❌ อัปโหลดรูปภาพไม่สำเร็จ";
+        }
+    }
+
+    // ถ้าไม่มี error เรื่องอัปโหลดรูป → ค่อย insert
+    if (!isset($error)) {
+        // ถ้าไม่อัปโหลดรูป image_name จะเป็น null ก็เก็บค่าว่างไปได้
+        $sql = "INSERT INTO products (product_code, name, quantity, image)
+                VALUES ('$product_code', '$name', '$quantity', '$image_name')";
+
+        if ($conn->query($sql)) {
+            header("Location: index.php");
+            exit;
+        } else {
+            $error = "❌ เกิดข้อผิดพลาดในการเพิ่มสินค้า";
+        }
     }
 }
 ?>
@@ -101,7 +136,8 @@ if (isset($_POST['add'])) {
         <p class="error"><?= $error; ?></p>
     <?php endif; ?>
 
-    <form method="post">
+    <!-- สำคัญ: enctype="multipart/form-data" เพื่อให้อัปโหลดไฟล์ได้ -->
+    <form method="post" enctype="multipart/form-data">
         <label>รหัสสินค้า</label>
         <input type="text" name="product_code" placeholder="เช่น P001" required>
 
@@ -111,8 +147,8 @@ if (isset($_POST['add'])) {
         <label>จำนวน</label>
         <input type="number" name="quantity" placeholder="จำนวน..." required>
 
-        <label>ลิงก์รูปภาพ (URL)</label>
-        <input type="text" name="image" placeholder="https://example.com/image.jpg">
+        <label>อัปโหลดรูปภาพสินค้า</label>
+        <input type="file" name="image" accept="image/*">
 
         <button type="submit" name="add">💾 บันทึกสินค้า</button>
     </form>
