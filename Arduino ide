@@ -1,0 +1,292 @@
+#include "esp_camera.h"
+#include <WiFi.h>
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
+#include "camera_pins.h"
+
+// ===== Motion baseline =====
+uint8_t* prev_buf = NULL;
+size_t prev_len = 0;
+
+// ===== WIFI =====
+const char* ssid = "Junior";
+const char* password = "Worawut2007";
+
+const char* server = "10.216.133.49";
+String path = "/inventory/upload.php";
+const int port = 80;
+
+// ===== MOTION SETTINGS =====
+unsigned long lastCapture = 0;
+unsigned long lastUpload  = 0;
+
+int motionCount = 0;
+bool motionLock = false;
+
+#define MOTION_THRESHOLD   8000
+#define MOTION_HYSTERESIS  3000
+#define SAMPLE_RATE        20
+#define CAPTURE_INTERVAL   500
+#define UPLOAD_COOLDOWN    6000
+#define CONFIRM_FRAMES     3
+
+//////////////////////////////////////////////////////
+
+void smartConnectWiFi() {
+
+  Serial.println("\nScanning WiFi...");
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+
+  int n = WiFi.scanNetworks();
+  bool found = false;
+
+  for (int i = 0; i < n; i++) {
+    if (WiFi.SSID(i) == ssid) {
+      found = true;
+      Serial.println("Target WiFi Found!");
+      break;
+    }
+  }
+
+  if (!found) {
+    Serial.println("WiFi not found → retry in 5 sec");
+    delay(5000);
+    return;
+  }
+
+  WiFi.begin(ssid, password);
+
+  Serial.print("Connecting");
+
+  unsigned long start = millis();
+
+  while (WiFi.status() != WL_CONNECTED &&
+         millis() - start < 15000) {
+
+    delay(400);
+    Serial.print(".");
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+
+    Serial.println("\nWiFi CONNECTED!");
+    Serial.print("IP: ");
+    Serial.println(WiFi.localIP());
+  }
+  else {
+    Serial.println("\nConnect fail → retry");
+  }
+}
+
+//////////////////////////////////////////////////////
+
+void maintainWiFi() {
+
+  static unsigned long lastCheck = 0;
+
+  if (millis() - lastCheck < 10000) return;
+  lastCheck = millis();
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi lost → reconnect");
+    smartConnectWiFi();
+  }
+}
+
+//////////////////////////////////////////////////////
+
+bool detectMotion(camera_fb_t *fb) {
+
+  if (!prev_buf) {
+
+    prev_len = fb->len;
+    prev_buf = (uint8_t*)malloc(prev_len);
+
+    if (!prev_buf) {
+      Serial.println("Malloc failed!");
+      return false;
+    }
+
+    memcpy(prev_buf, fb->buf, prev_len);
+    Serial.println("Baseline captured");
+    return false;
+  }
+
+  int diff = 0;
+  int len = min((int)fb->len, (int)prev_len);
+
+  for (int i = 0; i < len; i += SAMPLE_RATE) {
+    diff += abs(fb->buf[i] - prev_buf[i]);
+  }
+
+  Serial.print("DIFF = ");
+  Serial.println(diff);
+
+  bool motion = diff > (MOTION_THRESHOLD + MOTION_HYSTERESIS);
+
+  // update baseline เฉพาะตอนนิ่ง
+  if (!motion) {
+    memcpy(prev_buf, fb->buf, len);
+  }
+
+  return motion;
+}
+
+//////////////////////////////////////////////////////
+
+void uploadPhoto(camera_fb_t *fb) {
+
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  WiFiClient client;
+
+  if (!client.connect(server, port)) {
+    Serial.println("Server connect fail");
+    return;
+  }
+
+  String boundary = "esp32cam";
+
+  String head = "--" + boundary + "\r\n"
+                "Content-Disposition: form-data; name=\"file\"; filename=\"img.jpg\"\r\n"
+                "Content-Type: image/jpeg\r\n\r\n";
+
+  String tail = "\r\n--" + boundary + "--\r\n";
+
+  uint32_t totalLen = head.length() + fb->len + tail.length();
+
+  client.printf("POST %s HTTP/1.1\r\n", path.c_str());
+  client.printf("Host: %s\r\n", server);
+  client.println("Connection: close");
+  client.printf("Content-Length: %d\r\n", totalLen);
+  client.printf("Content-Type: multipart/form-data; boundary=%s\r\n\r\n", boundary.c_str());
+
+  client.print(head);
+  client.write(fb->buf, fb->len);
+  client.print(tail);
+
+  Serial.println("Uploading...");
+
+  // อ่าน response จริง
+  while (client.connected() || client.available()) {
+
+    if (client.available()) {
+      String line = client.readStringUntil('\n');
+      Serial.println(line);
+    }
+  }
+
+  client.stop();
+}
+
+//////////////////////////////////////////////////////
+
+void setup() {
+
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+
+  Serial.begin(115200);
+
+  smartConnectWiFi();
+
+  camera_config_t config;
+
+  config.ledc_channel = LEDC_CHANNEL_0;
+  config.ledc_timer = LEDC_TIMER_0;
+
+  config.pin_d0 = Y2_GPIO_NUM;
+  config.pin_d1 = Y3_GPIO_NUM;
+  config.pin_d2 = Y4_GPIO_NUM;
+  config.pin_d3 = Y5_GPIO_NUM;
+  config.pin_d4 = Y6_GPIO_NUM;
+  config.pin_d5 = Y7_GPIO_NUM;
+  config.pin_d6 = Y8_GPIO_NUM;
+  config.pin_d7 = Y9_GPIO_NUM;
+
+  config.pin_xclk = XCLK_GPIO_NUM;
+  config.pin_pclk = PCLK_GPIO_NUM;
+  config.pin_vsync = VSYNC_GPIO_NUM;
+  config.pin_href = HREF_GPIO_NUM;
+
+  config.pin_sscb_sda = SIOD_GPIO_NUM;
+  config.pin_sscb_scl = SIOC_GPIO_NUM;
+
+  config.pin_pwdn = PWDN_GPIO_NUM;
+  config.pin_reset = RESET_GPIO_NUM;
+
+  config.xclk_freq_hz = 20000000;
+
+  config.pixel_format = PIXFORMAT_JPEG;
+  config.frame_size   = FRAMESIZE_QVGA;
+  config.jpeg_quality = 14;
+  config.fb_count     = 1;
+
+  if (esp_camera_init(&config) != ESP_OK) {
+
+    Serial.println("Camera init failed → reboot");
+    delay(2000);
+    ESP.restart();
+  }
+
+  // 🔥 ทำให้ภาพนิ่ง ลด false motion
+  sensor_t * s = esp_camera_sensor_get();
+
+  s->set_exposure_ctrl(s, 0);
+  s->set_aec_value(s, 300);
+  s->set_gain_ctrl(s, 0);
+  s->set_whitebal(s, 0);
+
+  delay(2000); // warmup sensor
+
+  Serial.println("SYSTEM READY");
+}
+
+//////////////////////////////////////////////////////
+
+void loop() {
+
+  maintainWiFi();
+
+  if (millis() - lastCapture < CAPTURE_INTERVAL) return;
+  lastCapture = millis();
+
+  camera_fb_t *fb = esp_camera_fb_get();
+
+  if (!fb) {
+    Serial.println("Camera capture failed");
+    return;
+  }
+
+  bool motion = detectMotion(fb);
+
+  if (!motionLock) {
+
+    if (motion) {
+      motionCount++;
+      Serial.printf("Motion frame %d/%d\n", motionCount, CONFIRM_FRAMES);
+    }
+    else {
+      motionCount = 0;
+    }
+
+    if (motionCount >= CONFIRM_FRAMES &&
+        millis() - lastUpload > UPLOAD_COOLDOWN) {
+
+      Serial.println("✅ CONFIRMED MOTION → CAPTURE & UPLOAD");
+
+      uploadPhoto(fb);
+
+      lastUpload = millis();
+      motionLock = true;
+      motionCount = 0;
+    }
+  }
+
+  // ปลด lock เมื่อกลับมานิ่ง
+  if (!motion) {
+    motionLock = false;
+  }
+
+  esp_camera_fb_return(fb);
+}
